@@ -21,16 +21,20 @@ class BenchmarkRunnerFlexAttention(BenchmarkRunner):  # type: ignore[misc, no-an
         super().__init__("flex_attention")
 
     def create_input(self) -> Tuple[Any, ...]:
-        batch_size = 2 ** random.randint(0, 9)
-        num_heads = 16
-        slen = 2 ** random.randint(7, 13)
-        # head dims
-        d = 64
-        dtype = torch.float16
-        device = torch.device("cuda")
-        requires_grad = False
-        print(batch_size, num_heads, slen, slen, d, dtype, device, requires_grad)
-        return batch_size, num_heads, slen, slen, d, dtype, device, requires_grad
+        numel_max = 2**31
+        while True:
+            batch_size = 2 ** random.randint(0, 9)
+            num_heads = 16
+            slen = 2 ** random.randint(7, 13)
+            # head dims
+            d = 64
+            dtype = torch.float16
+            device = torch.device("cuda")
+            requires_grad = False
+            if batch_size * num_heads * slen * d >= numel_max:
+                continue
+            print(batch_size, num_heads, slen, slen, d, dtype, device, requires_grad)
+            return batch_size, num_heads, slen, slen, d, dtype, device, requires_grad
 
     def generate_inputs(
         self,
