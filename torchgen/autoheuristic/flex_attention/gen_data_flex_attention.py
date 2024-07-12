@@ -20,15 +20,42 @@ class BenchmarkRunnerFlexAttention(BenchmarkRunner):  # type: ignore[misc, no-an
     def __init__(self) -> None:
         super().__init__("flex_attention")
 
+    def random_multiple(self, multiple, min_num=7, max_num=17):
+        ran_pow2 = random.randint(min_num, max_num - 1)
+        start = (2**ran_pow2) // multiple
+        end = (2 ** (ran_pow2 + 1)) // multiple
+        random_multiple = random.randint(start, end)
+        return random_multiple * multiple
+
+    def get_random_dim(self, min, max):
+        pow2 = random.choices([True, False], [0.9, 0.1])[0]
+        if pow2:
+            return 2 ** random.randint(min, max)
+        else:
+            i = random.randint(min, max - 1)
+            lower = 2**i + 1
+            upper = 2 ** (i + 1) - 1
+            if lower > upper:
+                return lower
+            return random.randint(lower, upper)
+
+    def get_random_sequence_length(self, min, max):
+        pow2 = random.choices([True, False], [0.9, 0.1])[0]
+        if pow2:
+            return 2 ** random.randint(min, max)
+        else:
+            return self.random_multiple(128, min, max)
+
     def create_input(self) -> Tuple[Any, ...]:
         numel_max = 2**31
         while True:
-            batch_size = 2 ** random.randint(0, 9)
-            num_heads = 16
-            slen = 2 ** random.randint(7, 13)
-            # head dims
-            d = 64
-            dtype = torch.float16
+            batch_size = self.get_random_dim(0, 8)
+            num_heads = self.get_random_dim(0, 6)
+            # must be multiple of block size
+            slen = self.get_random_sequence_length(7, 13)
+            # head dims (must be >= 16)
+            d = 2 ** random.randint(4, 7)
+            dtype = random.choices([torch.bfloat16, torch.float16, torch.float32])[0]
             device = torch.device("cuda")
             requires_grad = False
             if batch_size * num_heads * slen * d >= numel_max:

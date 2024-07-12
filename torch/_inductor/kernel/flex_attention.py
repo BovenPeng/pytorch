@@ -711,7 +711,7 @@ def flex_attention(
             context.add_feature("h", h)
             context.add_feature("m", m)
             context.add_feature("n", n)
-            context.add_feature("dtype", query.get_dtype())
+            context.add_feature("dtype", query.get_dtype(), is_categorical=True)
             context_add_strides(context, "q", query.get_stride())
             return context
 
