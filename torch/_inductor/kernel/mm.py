@@ -8,6 +8,7 @@ from torch._inductor.autoheuristic.autoheuristic import AutoHeuristic, GlobalFee
 from torch._inductor.autoheuristic.autoheuristic_utils import (
     AHContext,
     context_add_strides,
+    mixed_mm_operations,
 )
 from torch._inductor.codegen.cpp_gemm_template import CppPackedGemmTemplate
 from torch._inductor.virtualized import V
@@ -500,6 +501,7 @@ def mixed_mm_autoheuristic(mat1, mat2, m, n, k, choices, name, input_nodes):
         feedback=feedback,
         context=context,
         name=name,
+        augment_context=mixed_mm_operations(),
     )
     choice_str = autoheuristic.get_choice()
     return choicestr2choice.get(choice_str, None)
