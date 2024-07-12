@@ -51,10 +51,12 @@ class BenchmarkRunnerFlexAttention(BenchmarkRunner):  # type: ignore[misc, no-an
         while True:
             batch_size = self.get_random_dim(0, 8)
             num_heads = self.get_random_dim(0, 6)
-            # must be multiple of block size
+
+            # slen must be multiple of block size
             slen = self.get_random_sequence_length(7, 13)
+
             # head dims (must be >= 16)
-            d = 2 ** random.randint(4, 7)
+            d = 2 ** random.randint(4, 8)
             dtype = random.choices([torch.bfloat16, torch.float16, torch.float32])[0]
             device = torch.device("cuda")
             requires_grad = False
