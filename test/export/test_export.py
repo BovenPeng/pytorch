@@ -315,9 +315,6 @@ graph():
     return (x,)""",
         )
 
-    # Errors because fake mode is not detected from non-tensor inputs
-    @testing.expectedFailureTrainingIRToRunDecompNonStrict
-    @testing.expectedFailureTrainingIRToRunDecomp
     def test_no_tensor_computation_3(self):
         class Module(torch.nn.Module):
             def forward(self, x, y):
@@ -3857,7 +3854,6 @@ def forward(self, b_a_buffer, x):
         ):
             graph_module.eval()
 
-    @testing.expectedFailureRetraceability  # T183144788
     def test_lifted_constants(self) -> None:
         class Module(torch.nn.Module):
             def forward(self, x):
@@ -3891,9 +3887,6 @@ def forward(self, b_a_buffer, x):
         self.assertEqual(len(ep.graph_signature.input_specs), 4)
         self.assertTrue(torch.allclose(ep.module()(*inp), transform.module()(*inp)))
 
-    @testing.expectedFailureRetraceability  # T183144788
-    @testing.expectedFailureTrainingIRToRunDecomp  # T193701164
-    @testing.expectedFailureTrainingIRToRunDecompNonStrict
     def test_tensor_attribute_zero_args(self):
         class Foo(torch.nn.Module):
             def __init__(self, value):
@@ -5527,9 +5520,6 @@ def forward(self, x):
     return (foo_functional,)""",
         )
 
-    # original input names aren't retraceable:
-    # compilation will succeed, but names won't match forward() signature.
-    @testing.expectedFailureRetraceability
     def test_placeholder_naming_collisions(self):
         # test collisions between nested user inputs
         class Foo(torch.nn.Module):
