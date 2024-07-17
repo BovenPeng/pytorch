@@ -2,7 +2,7 @@
 """ Triton Implementation of the flex_attention Kernel"""
 
 import logging
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import sympy
 
@@ -468,6 +468,14 @@ def _get_default_config_fwd(query) -> Tuple[int, int, int, int]:
     return default_config
 
 
+def _get_default_configs_fwd() -> List[Tuple[int, int, int, int]]:
+    if torch.cuda.get_device_capability() >= (9, 0):  # H100
+        return list(_h100_default_config.values())
+    elif torch.cuda.get_device_capability() >= (8, 0):  # A100
+        return list(_a100_default_config.values())
+    return []
+
+
 def _get_default_config_bwd(query) -> Tuple[int, int, int, int]:
     head_dim = query.get_size()[-1]
     dtype = query.get_dtype()
@@ -633,6 +641,9 @@ def flex_attention(
             (64, 128, 4, 3),
             (64, 64, 4, 3),
         ]
+        if config.run_autoheuristic("flex_attention"):
+            configs += _get_default_configs_fwd()
+            configs = list(set(configs))
 
     # Note, we don't need to pass in the captured buffers explicitly
     # because they're implicitly added by the score_mod function
