@@ -440,6 +440,9 @@ def _convert_mask_to_block_mask(
     assert mask.dtype == torch.bool
     mask = _broadcast_to_dim(mask, 4)
     B, H, Q, KV = mask.shape
+    is_decoding = Q < Q_BLOCK_SIZE
+    if is_decoding:
+        Q_BLOCK_SIZE = Q
     assert Q % Q_BLOCK_SIZE == 0
     assert KV % KV_BLOCK_SIZE == 0
     mask = mask.view(
@@ -452,6 +455,8 @@ def _convert_mask_to_block_mask(
         dim=[-2, -1]
     )  # [B, H, Q//Q_BLOCK_SIZE, KV//KV_BLOCK_SIZE]
     if separate_full_blocks:
+        if is_decoding:
+            raise NotImplementedError("NYI: partial block for flex decoding")
         full_block_sum = Q_BLOCK_SIZE * KV_BLOCK_SIZE
         full_blocks = mask_block_sum == full_block_sum
         partial_blocks = (mask_block_sum > 0) & (mask_block_sum < full_block_sum)
