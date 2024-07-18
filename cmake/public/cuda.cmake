@@ -243,6 +243,26 @@ else()
   message(STATUS "USE_CUSPARSELT is set to 0. Compiling without cuSPARSELt support")
 endif()
 
+# cufile
+if(CAFFE2_USE_CUFILE)
+  add_library(torch::cufile INTERFACE IMPORTED)
+  if(CAFFE2_STATIC_LINK_CUDA AND NOT WIN32)
+      set_property(
+          TARGET torch::cufile PROPERTY INTERFACE_LINK_LIBRARIES
+          CUDA::cuFile_static)
+  else()
+    if(NOT WIN32)
+          set_property(
+              TARGET torch::cufile PROPERTY INTERFACE_LINK_LIBRARIES
+              CUDA::cuFile)
+    else()
+      message(STATUS "On Windows. Compiling without cuFile support")
+    endif()
+  endif()
+else()
+  message(STATUS "USE_CUFILE is set to 0. Compiling without cuFile support")
+endif()
+
 # curand
 add_library(caffe2::curand INTERFACE IMPORTED)
 if(CAFFE2_STATIC_LINK_CUDA AND NOT WIN32)
