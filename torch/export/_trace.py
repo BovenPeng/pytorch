@@ -58,6 +58,7 @@ from torch.fx.experimental.symbolic_shapes import (
     free_unbacked_symbols,
     GuardOnDataDependentSymNode,
     ShapeEnv,
+    DataDependentErrorHandlerNonStrict,
 )
 from torch.fx.graph import _PyTreeCodeGen, _PyTreeInfo
 from torch.fx.passes.runtime_assert import insert_deferred_runtime_asserts
@@ -1626,7 +1627,7 @@ def _non_strict_export(
 
     fake_params_buffers = make_fake_params_buffers(fake_mode, _get_params_buffers(mod))
 
-    with fake_mode:
+    with fake_mode, DataDependentErrorHandlerNonStrict():
         with _fakify_script_objects(mod, fake_args, fake_kwargs, fake_mode) as (
             patched_mod,
             new_fake_args,

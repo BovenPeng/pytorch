@@ -16,6 +16,7 @@ import itertools
 import logging
 import math
 import operator
+import os
 import re
 import sys
 import threading
@@ -5516,3 +5517,88 @@ class PropagateUnbackedSymInts(torch.fx.Interpreter):
         result = super().run_node(n)
         rebind_unbacked(detect_fake_mode().shape_env, n, result)
         return result
+
+
+class _PythonPrinter(sympy.printing.str.StrPrinter):
+    def __init__(self, ns):
+        super().__init__()
+        self.ns = ns
+
+    def _print_Symbol(self, sym):
+        return self.ns[sym.name]
+
+    def _print_Relational(self, expr):
+        lhs = self.parenthesize(expr.lhs, sympy.printing.precedence.precedence(expr))
+        rel_op = expr.rel_op
+        rhs = self.parenthesize(expr.rhs, sympy.printing.precedence.precedence(expr))
+        return f"{lhs} {rel_op} {rhs}"
+
+
+def _parse_data_dependent_expr(e):
+    def _floor(x):
+        if isinstance(x, sympy.Mul):
+            a, b = x.args
+            if isinstance(a, sympy.Rational):
+                return FloorDiv(a.p * b, a.q)
+        return sympy.floor(x)
+
+    match = re.search("data-dependent expression (.+) \(unhinted", e.args[0])
+    return sympy.sympify(match.group(1)).replace(sympy.floor, _floor)
+
+
+def _suggest_fixes(e, expr, ns):
+    printer = _PythonPrinter(ns)
+    msg = e.args[0]
+    msg += f"\nSuggested fixes (please choose one of the following):"
+    suggested_fixes = [
+        f"torch._check({printer.doprint(expr)})",
+        f"torch._check({printer.doprint(sympy.Not(expr))})",
+    ]
+    for i, fix in enumerate(suggested_fixes):
+        msg += f"\n  {i+1}. {fix}"
+    e.args = (msg,)
+
+
+def _blame_user_code(e, frame):
+    frame_summary = traceback.FrameSummary(
+        frame.f_code.co_filename,
+        frame.f_lineno,
+        frame.f_code.co_name,
+    )
+    msg = e.args[0]
+    msg += (
+        '\n\nUser code:\n' +
+        ''.join(traceback.StackSummary.from_list([frame_summary]).format())
+    )
+    e.args = (msg,)
+
+
+def _suggest_fixes_for_data_dependent_error_non_strict(e):
+    frame = inspect.currentframe()
+    while frame is not None:
+        if not frame.f_code.co_filename.startswith(os.path.dirname(inspect.getfile(torch))):
+            parsed_expr = _parse_data_dependent_expr(e)
+            ns = {}
+            for var, val in frame.f_locals.items():
+                for path, leaf in pytree.tree_leaves_with_path(val):
+                    name = var + pytree.keystr(path)
+                    if isinstance(leaf, torch.SymInt):
+                        ns[str(leaf.node.expr)] = name
+                    elif isinstance(leaf, torch.Tensor):
+                        for i, dim in enumerate(leaf.shape):
+                            if isinstance(dim, torch.SymInt):
+                                ns[str(dim.node.expr)] = f"{name}.shape[{i}]"
+            _blame_user_code(e, frame)
+            _suggest_fixes(e, parsed_expr, ns)
+            break
+        frame = frame.f_back
+
+
+class DataDependentErrorHandlerNonStrict(torch.overrides.TorchFunctionMode):
+    def __torch_function__(self, func, types, args=(), kwargs=None):
+        kwargs = kwargs or {}
+        try:
+            return func(*args, **kwargs)
+        except GuardOnDataDependentSymNode as e:
+            _suggest_fixes_for_data_dependent_error_non_strict(e)
+            raise
